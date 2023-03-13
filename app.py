@@ -1,67 +1,361 @@
-import streamlit as st
+from flask import Flask, request, render_template
+from flask_cors import cross_origin
+import sklearn
 import pickle
-import numpy as np
+import pandas as pd
+
+app = Flask(__name__)
+model = pickle.load(open("flightfare_rf.pkl", "rb"))
 
 
-# import the model
-pipe = pickle.load(open('C:\\Laptop Price Recommendation\\pipe.pkl', 'rb'))
-A = pickle.load(open('C:\\Laptop Price Recommendation\\A.pkl', 'rb'))
+@app.route("/")
+@cross_origin()
+def home():
+    return render_template("home.html")
 
-st.title('Laptop Price Predictor')
 
-# brand
-company = st.selectbox('Brand', A['Company'].unique())
+@app.route("/predict", methods=["GET", "POST"])
+@cross_origin()
+def predict():
+    if request.method == "POST":
 
-# type of laptop
-Type = st.selectbox('Type', A['TypeName'].unique())
+        # Date_of_Journey
+        date_dep = request.form["Dep_Time"]
+        Journey_day = int(pd.to_datetime(date_dep, format="%Y-%m-%dT%H:%M").day)
+        Journey_month = int(pd.to_datetime(date_dep, format="%Y-%m-%dT%H:%M").month)
+        # print("Journey Date : ",Journey_day, Journey_month)
 
-# Ram
-ram = st.selectbox('RAM(in GB)', [2, 4, 6, 8, 12, 16, 24, 32, 64])
+        # Departure
+        Dep_hour = int(pd.to_datetime(date_dep, format="%Y-%m-%dT%H:%M").hour)
+        Dep_min = int(pd.to_datetime(date_dep, format="%Y-%m-%dT%H:%M").minute)
+        # print("Departure : ",Dep_hour, Dep_min)
 
-# weight
-weight = st.number_input('weight of the Laptop')
+        # Arrival
+        date_arr = request.form["Arrival_Time"]
+        Arrival_hour = int(pd.to_datetime(date_arr, format="%Y-%m-%dT%H:%M").hour)
+        Arrival_min = int(pd.to_datetime(date_arr, format="%Y-%m-%dT%H:%M").minute)
+        # print("Arrival : ", Arrival_hour, Arrival_min)
 
-# TouchScreen
-touchscreen = st.selectbox('Touchscreen', ['No', 'Yes'])
+        # Duration
+        dur_hour = abs(Arrival_hour - Dep_hour)
+        dur_min = abs(Arrival_min - Dep_min)
+        # print("Duration : ", dur_hour, dur_min)
 
-# IPS
-ips = st.selectbox('IPS', ['No', 'Yes'])
+        # Total Stops
+        Total_stops = int(request.form["stops"])
+        # print(Total_stops)
 
-# screen size
-screen_size = st.number_input('Screen Size')
+        # Airline
+        # AIR ASIA = 0 (not in column)
+        airline = request.form['airline']
+        if (airline == 'Jet Airways'):
+            Jet_Airways = 1
+            IndiGo = 0
+            Air_India = 0
+            Multiple_carriers = 0
+            SpiceJet = 0
+            Vistara = 0
+            GoAir = 0
+            Multiple_carriers_Premium_economy = 0
+            Jet_Airways_Business = 0
+            Vistara_Premium_economy = 0
+            Trujet = 0
 
-# resolution
-resolution = st.selectbox('Screen Resolution', ['1920x1080', '1366x768', '1600x900', '3840x2160',
-                                                '3200x1800', '2880x1800', '2560x1440', '2304x1440'])
+        elif (airline == 'IndiGo'):
+            Jet_Airways = 0
+            IndiGo = 1
+            Air_India = 0
+            Multiple_carriers = 0
+            SpiceJet = 0
+            Vistara = 0
+            GoAir = 0
+            Multiple_carriers_Premium_economy = 0
+            Jet_Airways_Business = 0
+            Vistara_Premium_economy = 0
+            Trujet = 0
 
-# cpu
-cpu = st.selectbox('Brand', A['Gpu brand'].unique())
+        elif (airline == 'Air India'):
+            Jet_Airways = 0
+            IndiGo = 0
+            Air_India = 1
+            Multiple_carriers = 0
+            SpiceJet = 0
+            Vistara = 0
+            GoAir = 0
+            Multiple_carriers_Premium_economy = 0
+            Jet_Airways_Business = 0
+            Vistara_Premium_economy = 0
+            Trujet = 0
 
-hdd = st.selectbox('HDD(in GB)', [0, 128, 256, 512, 1024, 2048])
+        elif (airline == 'Multiple carriers'):
+            Jet_Airways = 0
+            IndiGo = 0
+            Air_India = 0
+            Multiple_carriers = 1
+            SpiceJet = 0
+            Vistara = 0
+            GoAir = 0
+            Multiple_carriers_Premium_economy = 0
+            Jet_Airways_Business = 0
+            Vistara_Premium_economy = 0
+            Trujet = 0
 
-ssd = st.selectbox('SSD(in GB)', [0, 8, 128, 256, 512, 1024])
+        elif (airline == 'SpiceJet'):
+            Jet_Airways = 0
+            IndiGo = 0
+            Air_India = 0
+            Multiple_carriers = 0
+            SpiceJet = 1
+            Vistara = 0
+            GoAir = 0
+            Multiple_carriers_Premium_economy = 0
+            Jet_Airways_Business = 0
+            Vistara_Premium_economy = 0
+            Trujet = 0
 
-gpu = st.selectbox('GPU', A['Gpu brand'].unique())
+        elif (airline == 'Vistara'):
+            Jet_Airways = 0
+            IndiGo = 0
+            Air_India = 0
+            Multiple_carriers = 0
+            SpiceJet = 0
+            Vistara = 1
+            GoAir = 0
+            Multiple_carriers_Premium_economy = 0
+            Jet_Airways_Business = 0
+            Vistara_Premium_economy = 0
+            Trujet = 0
 
-os = st.selectbox('OS', A['os'].unique())
+        elif (airline == 'GoAir'):
+            Jet_Airways = 0
+            IndiGo = 0
+            Air_India = 0
+            Multiple_carriers = 0
+            SpiceJet = 0
+            Vistara = 0
+            GoAir = 1
+            Multiple_carriers_Premium_economy = 0
+            Jet_Airways_Business = 0
+            Vistara_Premium_economy = 0
+            Trujet = 0
 
-if st.button('Predict Price'):
-    # query
-    ppi = None
-    if touchscreen == 'Yes':
-        touchscreen = 1
-    else:
-        touchscreen = 0
+        elif (airline == 'Multiple carriers Premium economy'):
+            Jet_Airways = 0
+            IndiGo = 0
+            Air_India = 0
+            Multiple_carriers = 0
+            SpiceJet = 0
+            Vistara = 0
+            GoAir = 0
+            Multiple_carriers_Premium_economy = 1
+            Jet_Airways_Business = 0
+            Vistara_Premium_economy = 0
+            Trujet = 0
 
-    if ips == 'Yes':
-        ips = 1
-    else:
-        ips = 0
+        elif (airline == 'Jet Airways Business'):
+            Jet_Airways = 0
+            IndiGo = 0
+            Air_India = 0
+            Multiple_carriers = 0
+            SpiceJet = 0
+            Vistara = 0
+            GoAir = 0
+            Multiple_carriers_Premium_economy = 0
+            Jet_Airways_Business = 1
+            Vistara_Premium_economy = 0
+            Trujet = 0
 
-    X_res = int(resolution.split('x')[0])
-    Y_res = int(resolution.split('x')[0])
-    ppi = ((X_res**2) + (Y_res**2))**0.5/screen_size
-    query = np.array([company, Type, ram, weight, touchscreen, ips, ppi, cpu, hdd, ssd, gpu, os])
+        elif (airline == 'Vistara Premium economy'):
+            Jet_Airways = 0
+            IndiGo = 0
+            Air_India = 0
+            Multiple_carriers = 0
+            SpiceJet = 0
+            Vistara = 0
+            GoAir = 0
+            Multiple_carriers_Premium_economy = 0
+            Jet_Airways_Business = 0
+            Vistara_Premium_economy = 1
+            Trujet = 0
 
-    query = query.reshape(1, 12)
-    st.title("The Predicted price of this configuration is " + str(int(np.exp(pipe.predict(query)[0]))))
+        elif (airline == 'Trujet'):
+            Jet_Airways = 0
+            IndiGo = 0
+            Air_India = 0
+            Multiple_carriers = 0
+            SpiceJet = 0
+            Vistara = 0
+            GoAir = 0
+            Multiple_carriers_Premium_economy = 0
+            Jet_Airways_Business = 0
+            Vistara_Premium_economy = 0
+            Trujet = 1
+
+        else:
+            Jet_Airways = 0
+            IndiGo = 0
+            Air_India = 0
+            Multiple_carriers = 0
+            SpiceJet = 0
+            Vistara = 0
+            GoAir = 0
+            Multiple_carriers_Premium_economy = 0
+            Jet_Airways_Business = 0
+            Vistara_Premium_economy = 0
+            Trujet = 0
+
+        # print(Jet_Airways,
+        #     IndiGo,
+        #     Air_India,
+        #     Multiple_carriers,
+        #     SpiceJet,
+        #     Vistara,
+        #     GoAir,
+        #     Multiple_carriers_Premium_economy,
+        #     Jet_Airways_Business,
+        #     Vistara_Premium_economy,
+        #     Trujet)
+
+        # Source
+        # Banglore = 0 (not in column)
+        Source = request.form["Source"]
+        if (Source == 'Delhi'):
+            s_Delhi = 1
+            s_Kolkata = 0
+            s_Mumbai = 0
+            s_Chennai = 0
+
+        elif (Source == 'Kolkata'):
+            s_Delhi = 0
+            s_Kolkata = 1
+            s_Mumbai = 0
+            s_Chennai = 0
+
+        elif (Source == 'Mumbai'):
+            s_Delhi = 0
+            s_Kolkata = 0
+            s_Mumbai = 1
+            s_Chennai = 0
+
+        elif (Source == 'Chennai'):
+            s_Delhi = 0
+            s_Kolkata = 0
+            s_Mumbai = 0
+            s_Chennai = 1
+
+        else:
+            s_Delhi = 0
+            s_Kolkata = 0
+            s_Mumbai = 0
+            s_Chennai = 0
+
+        # print(s_Delhi,
+        #     s_Kolkata,
+        #     s_Mumbai,
+        #     s_Chennai)
+
+        # Destination
+        # Banglore = 0 (not in column)
+        Source = request.form["Destination"]
+        if (Source == 'Cochin'):
+            d_Cochin = 1
+            d_Delhi = 0
+            d_New_Delhi = 0
+            d_Hyderabad = 0
+            d_Kolkata = 0
+
+        elif (Source == 'Delhi'):
+            d_Cochin = 0
+            d_Delhi = 1
+            d_New_Delhi = 0
+            d_Hyderabad = 0
+            d_Kolkata = 0
+
+        elif (Source == 'New_Delhi'):
+            d_Cochin = 0
+            d_Delhi = 0
+            d_New_Delhi = 1
+            d_Hyderabad = 0
+            d_Kolkata = 0
+
+        elif (Source == 'Hyderabad'):
+            d_Cochin = 0
+            d_Delhi = 0
+            d_New_Delhi = 0
+            d_Hyderabad = 1
+            d_Kolkata = 0
+
+        elif (Source == 'Kolkata'):
+            d_Cochin = 0
+            d_Delhi = 0
+            d_New_Delhi = 0
+            d_Hyderabad = 0
+            d_Kolkata = 1
+
+        else:
+            d_Cochin = 0
+            d_Delhi = 0
+            d_New_Delhi = 0
+            d_Hyderabad = 0
+            d_Kolkata = 0
+
+        # print(
+        #     d_Cochin,
+        #     d_Delhi,
+        #     d_New_Delhi,
+        #     d_Hyderabad,
+        #     d_Kolkata
+        # )
+
+        #     ['Total_Stops', 'Journey_day', 'Journey_month', 'Dep_hour',
+        #    'Dep_min', 'Arrival_hour', 'Arrival_min', 'Duration_hours',
+        #    'Duration_mins', 'Airline_Air India', 'Airline_GoAir', 'Airline_IndiGo',
+        #    'Airline_Jet Airways', 'Airline_Jet Airways Business',
+        #    'Airline_Multiple carriers',
+        #    'Airline_Multiple carriers Premium economy', 'Airline_SpiceJet',
+        #    'Airline_Trujet', 'Airline_Vistara', 'Airline_Vistara Premium economy',
+        #    'Source_Chennai', 'Source_Delhi', 'Source_Kolkata', 'Source_Mumbai',
+        #    'Destination_Cochin', 'Destination_Delhi', 'Destination_Hyderabad',
+        #    'Destination_Kolkata', 'Destination_New Delhi']
+
+        prediction = model.predict([[
+            Total_stops,
+            Journey_day,
+            Journey_month,
+            Dep_hour,
+            Dep_min,
+            Arrival_hour,
+            Arrival_min,
+            dur_hour,
+            dur_min,
+            Air_India,
+            GoAir,
+            IndiGo,
+            Jet_Airways,
+            Jet_Airways_Business,
+            Multiple_carriers,
+            Multiple_carriers_Premium_economy,
+            SpiceJet,
+            Trujet,
+            Vistara,
+            Vistara_Premium_economy,
+            s_Chennai,
+            s_Delhi,
+            s_Kolkata,
+            s_Mumbai,
+            d_Cochin,
+            d_Delhi,
+            d_Hyderabad,
+            d_Kolkata,
+            d_New_Delhi
+        ]])
+
+        output = round(prediction[0], 2)
+
+        return render_template('home.html', prediction_text="Your Flight price is Rs. {}".format(output))
+
+    return render_template("home.html")
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
